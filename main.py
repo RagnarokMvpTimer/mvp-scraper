@@ -1,7 +1,10 @@
 import extractor
 import db
 
-print('==Extractor==')
-extractor.init()
-print('\n==Database==')
-db.init()
+
+if __name__ == '__main__':
+  print('==Extractor==')
+  extractor.init()
+
+  print('\n==Database==')
+  db.init()
