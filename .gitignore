@@ -1,5 +1,6 @@
 /mvps_icons/
 mvps_data.db
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
