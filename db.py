@@ -12,7 +12,7 @@ def get_mvp_data():
     return json.load(mvp_data)
 
 
-def create_db():
+def create_db() -> None:
   conn = db_connection()
   cursor = conn.cursor()
   cursor.execute("""
@@ -42,18 +42,18 @@ def create_db():
   conn.close()
 
 
-def populate():
+def populate() -> None:
   conn = db_connection()
   cursor = conn.cursor()
 
   mvp_data = get_mvp_data()
-  mvp_list = [] 
+  mvp_list = []
   respawn_list = []
-  
-  for mvp in mvp_data: 
+
+  for mvp in mvp_data:
     mvp_list.append((mvp['id'], mvp['name']))
-    for map in mvp['maps']:
-      respawn_list.append((mvp['id'], map['mapName'], map['respawnTime']))
+    for mvp_map in mvp['maps']:
+      respawn_list.append((mvp['id'], mvp_map['mapName'], mvp_map['respawnTime']))
 
   cursor.executemany('insert into mvp(id, name) values(?, ?)', mvp_list)
   cursor.executemany('insert into respawn(mvp_id, map_id, time) values(?, ?, ?)', respawn_list)
@@ -62,30 +62,34 @@ def populate():
   conn.close()
 
 
-def show_mvps():
+def show_mvps() -> None:
   conn = db_connection()
   cursor = conn.cursor()
   cursor.execute('select * from mvp')
-  for linha in cursor.fetchall():
-    print(linha) 
+  for line in cursor.fetchall():
+    print(line)
   conn.close()
 
 
-def show_respawn():
+def show_respawn() -> None:
   conn = db_connection()
   cursor = conn.cursor()
   cursor.execute('select mvp_id, map_id, time from respawn;')
-  for linha in cursor.fetchall():
-    print(linha) 
+  for line in cursor.fetchall():
+    print(line)
   conn.close()
 
 
-def init():
+def init() -> None:
   if os.path.exists('./mvps_data.db'):
-    os.remove('./mvps_data.db') 
+    os.remove('./mvps_data.db')
   create_db()
   populate()
   print('MVPs')
   show_mvps()
   print('\nRespawns')
   show_respawn()
+
+
+if __name__ == '__main__':
+  init()
