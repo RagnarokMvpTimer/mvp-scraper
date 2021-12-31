@@ -5,8 +5,9 @@ from lxml import html
 import requests
 
 
-NO_FILTER = 1
-NO_ICONS = 0
+USE_FILTER = False
+NO_ICONS = False
+IGNORE_EMPTY_MAPS = False
 HEADERS = {
   'Accept-Language': 'en-US'
 }
@@ -22,6 +23,7 @@ def get_mvps_id() -> list[str]:
     mvps_href = tree.xpath('//*[tbody]//*[tr]//*[@class="mvp"]/span/a/@href')
     for href in mvps_href:
       ids.append(href.rsplit('/', 4)[3])
+  print(f'Found {len(ids)} mvps ids.')
   return ids
 
 
@@ -66,6 +68,7 @@ def get_mvp_info(mvp_id: str, api_key: str) -> Optional[dict]:
 def get_mvp_icon(mvp_id: str) -> None:
   image_path = f'./mvps_icons/{mvp_id}.png'
   if os.path.exists(image_path):
+    print(f'[{mvp_id}] Icon already exists, skipping...')
     return
 
   print(f'[{mvp_id}] Downloading mvp icon {mvp_id}.png')
@@ -79,7 +82,7 @@ def get_mvp_icon(mvp_id: str) -> None:
 def init() -> None:
   try:
     print(f'MVPs Icons will {"not " if NO_ICONS else ""}be downloaded.')
-    print(f'MVPs will {"not " if NO_FILTER else ""}be filtered.')
+    print(f'MVPs will {"not " if not USE_FILTER else ""}be filtered.')
 
     if not NO_ICONS and not os.path.exists('./mvps_icons/'):
       os.makedirs('./mvps_icons/', exist_ok=True)
@@ -93,7 +96,6 @@ def init() -> None:
 
     mvps_ids = get_mvps_id()
     if not mvps_ids:
-      print('No mvps ids found. Aborting...')
       raise Exception('No mvps ids found.')
 
     mvps_data = []
@@ -102,13 +104,12 @@ def init() -> None:
       if not mvp_info:
         print(f'[{mvp_id}] Failed to fetch mvp info, skipping...')
         continue
-      if len(mvp_info['spawn']) == 0:
+      if IGNORE_EMPTY_MAPS and len(mvp_info['spawn']) == 0:
         print(f'[{mvp_id}] No spawn maps, skipping...')
         continue
-      mvps_data.append(mvp_info if NO_FILTER else filter_mvp(mvp_info))
+      mvps_data.append(mvp_info if not USE_FILTER else filter_mvp(mvp_info))
       if not NO_ICONS:
         get_mvp_icon(mvp_id.rstrip('\n'))
-
     with open('./mvps_data.json', 'w', encoding='utf-8') as mvps_data_file:
       json.dump(mvps_data, mvps_data_file, indent=2)
   except KeyboardInterrupt:
