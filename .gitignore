@@ -1,7 +1,9 @@
 /mvps_icons/
+/maps/
 mvps_data.json
 mvps_data.db
 .vscode
+.idea
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
