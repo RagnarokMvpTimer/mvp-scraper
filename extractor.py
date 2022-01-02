@@ -7,7 +7,6 @@ from lxml import html
 
 from utils import download_img
 
-
 USE_FILTER = False
 NO_ICONS = False
 NO_MAP_IMGS = False
@@ -22,7 +21,7 @@ def get_mvp_icon(mvp_id: str) -> None:
   download_img(
     f'./mvps_icons/{mvp_id}.png',
     f'https://static.divine-pride.net/images/mobs/png/{mvp_id}.png',
-    'Icon already exists, skipping...',
+    f'[{mvp_id}] Icon already exists, skipping...',
     f'[{mvp_id}] Downloading mvp icon {mvp_id}.png',
     f'[{mvp_id}] Completed download mvp icon {mvp_id}.png',
     f'[{mvp_id}] Failed to download mvp icon {mvp_id}.png',
