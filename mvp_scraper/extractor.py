@@ -5,16 +5,7 @@ from typing import Optional
 import requests
 from lxml import html
 
-from utils import download_img
-
-USE_FILTER = False
-NO_ICONS = False
-NO_MAP_IMGS = False
-IGNORE_EMPTY_MAPS = False
-HEADERS = {
-  'Accept-Language': 'en-US'
-}
-STATS_FILTER = ['level', 'health', 'baseExperience', 'jobExperience']
+from mvp_scraper.utils import download_img
 
 
 def get_mvp_icon(mvp_id: str) -> None:
@@ -61,52 +52,56 @@ def get_mvps_id() -> list[str]:
 
 
 def filter_maps(maps: list) -> list[dict]:
-  filtered_maps = []
-  for item in maps:
-    if item['respawnTime'] != 0:
-      filtered_maps.append({
-        "mapName": item['mapname'],
-        "respawnTime": item['respawnTime']
-      })
-  return filtered_maps
+  return [
+    {
+      "mapname": item['mapname'],
+      "respawnTime": item['respawnTime']
+    }
+    for item in maps
+    if item['respawnTime'] != 0
+  ]
 
 
-def filter_stats(stats: dict) -> dict:
+def filter_stats(stats: dict, desired_stats: list[str]) -> dict:
   filtered_stats = {}
   for item in stats:
-    if item in STATS_FILTER:
+    if item in desired_stats:
       filtered_stats[item] = stats[item]
   return filtered_stats
 
 
-def filter_mvp(mvp: dict) -> dict:
+def filter_mvp(mvp: dict, desired_stats: list[str]) -> dict:
   print(f'[{mvp["id"]}] Filtering mvp...')
   return {
     'id': mvp['id'],
     'dbname': mvp['dbname'],
     'name': mvp['name'],
     'maps': filter_maps(mvp['spawn']),
-    'stats': filter_stats(mvp['stats'])
+    'stats': filter_stats(mvp['stats'], desired_stats)
   }
 
 
-def get_mvp_info(mvp_id: str, api_key: str) -> Optional[dict]:
+def get_mvp_info(mvp_id: str, api_key: str, headers: Optional[dict] = None) -> Optional[dict]:
   print(f'[{mvp_id}] Fetching mvp info...')
   mvp_info = requests.get(
     f'https://www.divine-pride.net/api/database/Monster/{mvp_id}?apiKey={api_key}',
-    headers=HEADERS).json()
+    headers=headers or {'Accept-Language': 'en-US'}
+  ).json()
   return mvp_info if mvp_info else None
 
 
-def init() -> None:
+def extractor(use_filter: bool = False, no_icons: bool = False, no_map_imgs: bool = False,
+              ignore_empty_maps: bool = False,
+              desired_stats: Optional[list[str]] = None,
+              headers: Optional[dict] = None) -> None:
   try:
-    print(f'MVPs will {"not " if not USE_FILTER else ""}be filtered.')
-    print(f'MVPs Icons will {"not " if NO_ICONS else ""}be downloaded.')
-    print(f'MVPs Maps will {"not " if NO_MAP_IMGS else ""}be downloaded.')
+    print(f'MVPs will {"not " if not use_filter else ""}be filtered.')
+    print(f'MVPs Icons will {"not " if no_icons else ""}be downloaded.')
+    print(f'MVPs Maps will {"not " if no_map_imgs else ""}be downloaded.')
 
-    if not NO_ICONS and not os.path.exists('./mvps_icons/'):
+    if not no_icons and not os.path.exists('./mvps_icons/'):
       os.makedirs('./mvps_icons/', exist_ok=True)
-    if not NO_MAP_IMGS and not os.path.exists('./maps/'):
+    if not no_map_imgs and not os.path.exists('./maps/'):
       os.makedirs('./maps/', exist_ok=True)
     if os.path.exists('./mvps_data.json'):
       override = input('mvps_data.json already exists, override? (y/n) ')
@@ -122,25 +117,40 @@ def init() -> None:
 
     mvps_data = []
     for mvp_id in mvps_ids:
-      mvp_info = get_mvp_info(mvp_id, api_key)
+      mvp_info = get_mvp_info(mvp_id, api_key, headers)
       if not mvp_info:
         print(f'[{mvp_id}] Failed to fetch mvp info, skipping...')
         continue
-      if IGNORE_EMPTY_MAPS and len(mvp_info['spawn']) == 0:
+      if ignore_empty_maps and not len(mvp_info['spawn']):
         print(f'[{mvp_id}] No spawn maps, skipping...')
         continue
-      mvps_data.append(mvp_info if not USE_FILTER else filter_mvp(mvp_info))
-      if not NO_ICONS:
+
+      mvps_data.append(mvp_info if not use_filter else filter_mvp(mvp_info, desired_stats))
+
+      if not no_icons:
         get_mvp_icon(mvp_id.rstrip('\n'))
-      if not NO_MAP_IMGS:
+      if not no_map_imgs:
         for map_i in mvp_info['spawn']:
           get_map_img(map_i['mapname'], mvp_id)
+
     with open('./mvps_data.json', 'w', encoding='utf-8') as mvps_data_file:
       json.dump(mvps_data, mvps_data_file, indent=2)
+
   except KeyboardInterrupt:
     print('Aborting...')
   except Exception as e:
     print(f'{e} | {e.__class__.__name__}')
+
+
+def init():
+  no_icons = False
+  no_map_imgs = False
+  ignore_empty_maps = False
+  use_filter = False
+  desired_stats = ['level', 'health', 'baseExperience', 'jobExperience']
+  headers = None  # {'Accept-Language': 'pt-BR'}
+
+  extractor(use_filter, no_icons, no_map_imgs, ignore_empty_maps, desired_stats, headers)
 
 
 if __name__ == '__main__':

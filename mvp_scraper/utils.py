@@ -11,7 +11,7 @@ def download_img(output_path: str, url: str, on_exist: str, on_start: str, on_co
   data = requests.get(url).content
 
   if len(data) <= 0:
-    #raise Exception('')
+    # raise Exception('')
     return print(on_error)
 
   with open(output_path, 'wb') as file:
