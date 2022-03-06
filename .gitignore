@@ -1,5 +1,6 @@
 /mvps_icons/
 /maps/
+/output/
 mvps_data.json
 mvps_data.db
 .vscode
@@ -105,7 +106,6 @@ celerybeat-schedule
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
