@@ -1,16 +1,19 @@
 import json
+import multiprocessing as mp
 import os
+from pathlib import Path
 from typing import Optional
 
 import requests
+from environs import Env
 from lxml import html
 
-from mvp_scraper.utils import download_img
+from mvp_scraper.utils import download_img, get_output_path
 
 
-def get_mvp_icon(mvp_id: str) -> None:
+def get_mvp_icon(mvp_id: str, output_path: Path) -> None:
   download_img(
-    f'./mvps_icons/{mvp_id}.png',
+    Path.joinpath(output_path, '/mvps_icons/', f'{mvp_id}.png'),
     f'https://static.divine-pride.net/images/mobs/png/{mvp_id}.png',
     f'[{mvp_id}] Icon already exists, skipping...',
     f'[{mvp_id}] Downloading mvp icon {mvp_id}.png',
@@ -19,9 +22,9 @@ def get_mvp_icon(mvp_id: str) -> None:
   )
 
 
-def get_map_img(map_name: str, mvp_id: str) -> None:
+def get_map_img(map_name: str, mvp_id: str, output_path: Path) -> None:
   download_img(
-    f'./maps/{map_name}.png',
+    Path.joinpath(output_path, '/maps/', f'{map_name}.png'),
     f'https://www.divine-pride.net/img/map/original/{map_name}',
     f'[{mvp_id}] Map img already exists, skipping...',
     f'[{mvp_id}] Downloading map {map_name}.png',
@@ -29,7 +32,7 @@ def get_map_img(map_name: str, mvp_id: str) -> None:
     f'[{mvp_id}] Failed to download map {map_name}.png'
   )
   download_img(
-    f'./maps/{map_name}_raw.png',
+    Path.joinpath(output_path, '/maps/', f'{map_name}_raw.png'),
     f'https://www.divine-pride.net/img/map/raw/{map_name}',
     f'[{mvp_id}] Raw Map img already exists, skipping...',
     f'[{mvp_id}] Downloading raw map {map_name}.png',
@@ -51,107 +54,140 @@ def get_mvps_id() -> list[str]:
   return ids
 
 
-def filter_maps(maps: list) -> list[dict]:
-  return [
-    {
-      "mapname": item['mapname'],
-      "respawnTime": item['respawnTime']
+class Filter:
+  def __init__(self, desired_stats: Optional[list[str]] = None) -> None:
+    self.desired_stats = desired_stats
+
+  @staticmethod
+  def filter_maps(maps: list) -> list[dict]:
+    return [
+      {
+        "mapname": item['mapname'],
+        "respawnTime": item['respawnTime']
+      }
+      for item in maps
+      if item['respawnTime'] != 0
+    ]
+
+  def filter_stats(self, stats: dict) -> dict:
+    return stats if not self.desired_stats else \
+      {
+        item: stats[item]
+        for item in stats
+        if item in self.desired_stats
+      }
+
+  def filter_mvp(self, mvp: dict) -> dict:
+    print(f'[{mvp["id"]}] Filtering mvp...')
+    return {
+      'id': mvp['id'],
+      'dbname': mvp['dbname'],
+      'name': mvp['name'],
+      'maps': self.filter_maps(mvp['spawn']),
+      'stats': self.filter_stats(mvp['stats'])
     }
-    for item in maps
-    if item['respawnTime'] != 0
-  ]
 
 
-def filter_stats(stats: dict, desired_stats: list[str]) -> dict:
-  filtered_stats = {}
-  for item in stats:
-    if item in desired_stats:
-      filtered_stats[item] = stats[item]
-  return filtered_stats
+class Extractor:
+  def __init__(self,
+               use_filter: bool = False,
+               no_icons: bool = False,
+               no_map_images: bool = False,
+               ignore_mvp_with_empty_maps: bool = False,
+               desired_stats: Optional[list[str]] = None,
+               api_key: str = None,
+               headers: Optional[dict] = None,
+               output_path: Optional[Path] = None
+               ) -> None:
+    self.use_filter = use_filter
+    self.no_icons = no_icons
+    self.no_map_images = no_map_images
+    self.ignore_mvp_with_empty_maps = ignore_mvp_with_empty_maps
+    self.desired_stats = desired_stats
+    self.api_key = api_key
+    self.headers = headers or {'Accept-Language': 'en-US'}
+    self.filter = Filter(desired_stats)
+    self.output_path = output_path or get_output_path()
+
+  def get_mvp_info(self, mvp_id: str):
+    print(f'[{mvp_id}] Fetching mvp info...')
+    mvp_info = requests.get(
+      f'https://www.divine-pride.net/api/database/Monster/{mvp_id}?apiKey={self.api_key}',
+      headers=self.headers
+    ).json()
+    return mvp_info if mvp_info else None
+
+  def get_mvp_data(self, mvp_id: str):
+    mvp_info = self.get_mvp_info(mvp_id)
+
+    if not mvp_info:
+      return print(f'[{mvp_id}] Failed to fetch mvp info, skipping...')
+
+    if self.ignore_mvp_with_empty_maps and not len(mvp_info['spawn']):
+      return print(f'[{mvp_id}] No spawn maps, skipping...')
+
+    if not self.no_icons:
+      get_mvp_icon(mvp_id.rstrip('\n'), self.output_path)
+
+    if not self.no_map_images:
+      for map_item in mvp_info['spawn']:
+        get_map_img(map_item['mapname'], mvp_id, self.output_path)
+
+    return mvp_info if not self.use_filter else self.filter.filter_mvp(mvp_info)
+
+  def extract(self) -> None:
+    try:
+      print(f'MVPs will {"not " if not self.use_filter else ""}be filtered.')
+      print(f'MVPs Icons will {"not " if self.no_icons else ""}be downloaded.')
+      print(f'MVPs Maps will {"not " if self.no_map_images else ""}be downloaded.')
+
+      if not self.no_icons and not self.output_path.joinpath('mvps_icons').exists():
+        Path.mkdir(self.output_path.joinpath('mvps_icons'), parents=True, exist_ok=True)
+
+      if not self.no_map_images and not self.output_path.joinpath('maps').exists():
+        Path.mkdir(self.output_path.joinpath('maps'), parents=True, exist_ok=True)
+
+      if self.output_path.joinpath('mvps_data.json').exists():
+        override = input('mvps_data.json already exists, override? (y/n) ')
+        if override.lower() == 'n':
+          return print('Aborting...')
+
+      mvps_ids = get_mvps_id()
+      if not mvps_ids:
+        raise Exception('No mvps ids found.')
+
+      pool = mp.Pool(os.cpu_count() or 1)
+      mvps_data = pool.starmap(self.get_mvp_data, zip(mvps_ids))
+
+      with self.output_path.joinpath('mvps_data.json').open('w', encoding='utf-8') as mvps_data_file:
+        json.dump(mvps_data, mvps_data_file, indent=2)
+
+    except KeyboardInterrupt:
+      print('Aborting...')
+    except Exception as e:
+      print(f'{e} | {e.__class__.__name__}')
+      exit()
 
 
-def filter_mvp(mvp: dict, desired_stats: list[str]) -> dict:
-  print(f'[{mvp["id"]}] Filtering mvp...')
-  return {
-    'id': mvp['id'],
-    'dbname': mvp['dbname'],
-    'name': mvp['name'],
-    'maps': filter_maps(mvp['spawn']),
-    'stats': filter_stats(mvp['stats'], desired_stats)
-  }
+def start():
+  env = Env()
+  env.read_env()
 
+  divine_pride_api_key = env.str('DIVINE_PRIDE_API_KEY', None)
+  if not divine_pride_api_key:
+    return print('Divine pride api not found, aborting...')
 
-def get_mvp_info(mvp_id: str, api_key: str, headers: Optional[dict] = None) -> Optional[dict]:
-  print(f'[{mvp_id}] Fetching mvp info...')
-  mvp_info = requests.get(
-    f'https://www.divine-pride.net/api/database/Monster/{mvp_id}?apiKey={api_key}',
-    headers=headers or {'Accept-Language': 'en-US'}
-  ).json()
-  return mvp_info if mvp_info else None
+  no_icons = env.bool('NO_ICONS', False)
+  no_map_images = env.bool('NO_MAP_IMAGES', False)
+  ignore_mvp_with_empty_maps = env.bool('IGNORE_MVP_WITH_EMPTY_MAPS', False)
+  use_filter = env.bool('USE_FILTER', False)
+  desired_stats = env.list('DESIRED_STATS', None)
+  output_path = get_output_path()
 
-
-def extractor(use_filter: bool = False, no_icons: bool = False, no_map_imgs: bool = False,
-              ignore_empty_maps: bool = False,
-              desired_stats: Optional[list[str]] = None,
-              headers: Optional[dict] = None) -> None:
-  try:
-    print(f'MVPs will {"not " if not use_filter else ""}be filtered.')
-    print(f'MVPs Icons will {"not " if no_icons else ""}be downloaded.')
-    print(f'MVPs Maps will {"not " if no_map_imgs else ""}be downloaded.')
-
-    if not no_icons and not os.path.exists('./mvps_icons/'):
-      os.makedirs('./mvps_icons/', exist_ok=True)
-    if not no_map_imgs and not os.path.exists('./maps/'):
-      os.makedirs('./maps/', exist_ok=True)
-    if os.path.exists('./mvps_data.json'):
-      override = input('mvps_data.json already exists, override? (y/n) ')
-      if override.lower() == 'n':
-        print('Aborting...')
-        return
-
-    api_key = input('Enter your divine pride api key\n> ')
-
-    mvps_ids = get_mvps_id()
-    if not mvps_ids:
-      raise Exception('No mvps ids found.')
-
-    mvps_data = []
-    for mvp_id in mvps_ids:
-      mvp_info = get_mvp_info(mvp_id, api_key, headers)
-      if not mvp_info:
-        print(f'[{mvp_id}] Failed to fetch mvp info, skipping...')
-        continue
-      if ignore_empty_maps and not len(mvp_info['spawn']):
-        print(f'[{mvp_id}] No spawn maps, skipping...')
-        continue
-
-      mvps_data.append(mvp_info if not use_filter else filter_mvp(mvp_info, desired_stats))
-
-      if not no_icons:
-        get_mvp_icon(mvp_id.rstrip('\n'))
-      if not no_map_imgs:
-        for map_i in mvp_info['spawn']:
-          get_map_img(map_i['mapname'], mvp_id)
-
-    with open('./mvps_data.json', 'w', encoding='utf-8') as mvps_data_file:
-      json.dump(mvps_data, mvps_data_file, indent=2)
-
-  except KeyboardInterrupt:
-    print('Aborting...')
-  except Exception as e:
-    print(f'{e} | {e.__class__.__name__}')
-
-
-def init():
-  no_icons = False
-  no_map_imgs = False
-  ignore_empty_maps = False
-  use_filter = False
-  desired_stats = ['level', 'health', 'baseExperience', 'jobExperience']
-  headers = None  # {'Accept-Language': 'pt-BR'}
-
-  extractor(use_filter, no_icons, no_map_imgs, ignore_empty_maps, desired_stats, headers)
+  extractor = Extractor(use_filter, no_icons, no_map_images, ignore_mvp_with_empty_maps, desired_stats,
+                        output_path=output_path)
+  extractor.extract()
 
 
 if __name__ == '__main__':
-  init()
+  start()
