@@ -8,8 +8,15 @@ def db_connection():
 
 
 def get_mvp_data():
-  with open('./mvps_data.json', encoding='utf-8') as mvp_data:
-    return json.load(mvp_data)
+  try:
+    with open('./mvps_data.json', encoding='utf-8') as mvp_data:
+      return json.load(mvp_data)
+  except FileNotFoundError:
+    print('No mvps_data.json found. Aborting...')
+    exit()
+  except Exception as e:
+    print(f'{e} | {e.__class__.__name__}')
+    exit()
 
 
 def create_db() -> None:
