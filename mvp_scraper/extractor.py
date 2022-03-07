@@ -13,7 +13,7 @@ from mvp_scraper.utils import download_img, get_output_path
 
 def get_mvp_icon(mvp_id: str, output_path: Path) -> None:
   download_img(
-    Path.joinpath(output_path, '/mvps_icons/', f'{mvp_id}.png'),
+    output_path.joinpath('mvps_icons', f'{mvp_id}.png'),
     f'https://static.divine-pride.net/images/mobs/png/{mvp_id}.png',
     f'[{mvp_id}] Icon already exists, skipping...',
     f'[{mvp_id}] Downloading mvp icon {mvp_id}.png',
@@ -24,7 +24,7 @@ def get_mvp_icon(mvp_id: str, output_path: Path) -> None:
 
 def get_map_img(map_name: str, mvp_id: str, output_path: Path) -> None:
   download_img(
-    Path.joinpath(output_path, '/maps/', f'{map_name}.png'),
+    output_path.joinpath('maps', f'{map_name}.png'),
     f'https://www.divine-pride.net/img/map/original/{map_name}',
     f'[{mvp_id}] Map img already exists, skipping...',
     f'[{mvp_id}] Downloading map {map_name}.png',
@@ -32,7 +32,7 @@ def get_map_img(map_name: str, mvp_id: str, output_path: Path) -> None:
     f'[{mvp_id}] Failed to download map {map_name}.png'
   )
   download_img(
-    Path.joinpath(output_path, '/maps/', f'{map_name}_raw.png'),
+    output_path.joinpath('maps', f'{map_name}_raw.png'),
     f'https://www.divine-pride.net/img/map/raw/{map_name}',
     f'[{mvp_id}] Raw Map img already exists, skipping...',
     f'[{mvp_id}] Downloading raw map {map_name}.png',
@@ -109,7 +109,7 @@ class Extractor:
     self.filter = Filter(desired_stats)
     self.output_path = output_path or get_output_path()
 
-  def get_mvp_info(self, mvp_id: str):
+  def get_mvp_info(self, mvp_id: str) -> Optional[dict]:
     print(f'[{mvp_id}] Fetching mvp info...')
     mvp_info = requests.get(
       f'https://www.divine-pride.net/api/database/Monster/{mvp_id}?apiKey={self.api_key}',
@@ -117,7 +117,7 @@ class Extractor:
     ).json()
     return mvp_info if mvp_info else None
 
-  def get_mvp_data(self, mvp_id: str):
+  def get_mvp_data(self, mvp_id: str) -> Optional[dict]:
     mvp_info = self.get_mvp_info(mvp_id)
 
     if not mvp_info:
@@ -165,11 +165,11 @@ class Extractor:
     except KeyboardInterrupt:
       print('Aborting...')
     except Exception as e:
-      print(f'{e} | {e.__class__.__name__}')
+      # print(f'{e} | {e.__class__.__name__}')
       exit()
 
 
-def start():
+def start() -> None:
   env = Env()
   env.read_env()
 
