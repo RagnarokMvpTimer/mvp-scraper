@@ -83,7 +83,7 @@ class Filter:
       'id': mvp['id'],
       'dbname': mvp['dbname'],
       'name': mvp['name'],
-      'maps': self.filter_maps(mvp['spawn']),
+      'spawn': self.filter_maps(mvp['spawn']),
       'stats': self.filter_stats(mvp['stats'])
     }
 
@@ -123,6 +123,9 @@ class Extractor:
     if not mvp_info:
       return print(f'[{mvp_id}] Failed to fetch mvp info, skipping...')
 
+    if self.use_filter:
+      mvp_info = self.filter.filter_mvp(mvp_info)
+
     if self.ignore_mvp_with_empty_maps and not len(mvp_info['spawn']):
       return print(f'[{mvp_id}] No spawn maps, skipping...')
 
@@ -133,7 +136,7 @@ class Extractor:
       for map_item in mvp_info['spawn']:
         get_map_img(map_item['mapname'], mvp_id, self.output_path)
 
-    return mvp_info if not self.use_filter else self.filter.filter_mvp(mvp_info)
+    return mvp_info
 
   def extract(self) -> None:
     try:
