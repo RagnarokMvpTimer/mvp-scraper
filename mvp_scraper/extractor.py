@@ -158,6 +158,7 @@ class Extractor:
 
       pool = mp.Pool(os.cpu_count() or 1)
       mvps_data = pool.starmap(self.get_mvp_data, zip(mvps_ids))
+      mvps_data = list(filter(lambda item: item is not None, mvps_data))
 
       with self.output_path.joinpath('mvps_data.json').open('w', encoding='utf-8') as mvps_data_file:
         json.dump(mvps_data, mvps_data_file, indent=2)
