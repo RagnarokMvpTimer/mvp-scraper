@@ -185,6 +185,7 @@ def start() -> None:
   output_path = get_output_path()
 
   extractor = Extractor(use_filter, no_icons, no_map_images, ignore_mvp_with_empty_maps, desired_stats,
+                        divine_pride_api_key,
                         output_path=output_path)
   extractor.extract()
 
