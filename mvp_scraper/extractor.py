@@ -41,6 +41,17 @@ def get_map_img(map_name: str, mvp_id: str, output_path: Path) -> None:
   )
 
 
+def get_animated_sprite(mvp_id: str, output_path: Path) -> None:
+  download_img(
+    output_path.joinpath('mvps_icons_animated', f'{mvp_id}.png'),
+    f'https://db.irowiki.org/image/monster/{mvp_id}.png',
+    f'[{mvp_id}] Animated sprite already exists, skipping...',
+    f'[{mvp_id}] Downloading animated mvp icon {mvp_id}.png',
+    f'[{mvp_id}] Completed download animated mvp icon {mvp_id}.png',
+    f'[{mvp_id}] Failed to download animated mvp icon {mvp_id}.png',
+  )
+
+
 def get_mvps_id() -> list[str]:
   print('Fetching mvps ids from divine pride...')
   ids = []
@@ -92,6 +103,7 @@ class Extractor:
   def __init__(self,
                use_filter: bool = False,
                no_icons: bool = False,
+               no_animated_sprites: bool = False,
                no_map_images: bool = False,
                ignore_mvp_with_empty_maps: bool = False,
                desired_stats: Optional[list[str]] = None,
@@ -101,6 +113,7 @@ class Extractor:
                ) -> None:
     self.use_filter = use_filter
     self.no_icons = no_icons
+    self.no_animated_sprites = no_animated_sprites
     self.no_map_images = no_map_images
     self.ignore_mvp_with_empty_maps = ignore_mvp_with_empty_maps
     self.desired_stats = desired_stats
@@ -132,6 +145,9 @@ class Extractor:
     if not self.no_icons:
       get_mvp_icon(mvp_id.rstrip('\n'), self.output_path)
 
+    if not self.no_animated_sprites:
+      get_animated_sprite(mvp_id.rstrip('\n'), self.output_path)
+
     if not self.no_map_images:
       for map_item in mvp_info['spawn']:
         get_map_img(map_item['mapname'], mvp_id, self.output_path)
@@ -142,10 +158,14 @@ class Extractor:
     try:
       print(f'MVPs will {"not " if not self.use_filter else ""}be filtered.')
       print(f'MVPs Icons will {"not " if self.no_icons else ""}be downloaded.')
+      print(f'MVPs Animated Sprites will {"not " if self.no_animated_sprites else ""}be downloaded.')
       print(f'MVPs Maps will {"not " if self.no_map_images else ""}be downloaded.')
 
       if not self.no_icons and not self.output_path.joinpath('mvps_icons').exists():
         Path.mkdir(self.output_path.joinpath('mvps_icons'), parents=True, exist_ok=True)
+
+      if not self.no_animated_sprites and not self.output_path.joinpath('mvps_icons_animated').exists():
+        Path.mkdir(self.output_path.joinpath('mvps_icons_animated'), parents=True, exist_ok=True)
 
       if not self.no_map_images and not self.output_path.joinpath('maps').exists():
         Path.mkdir(self.output_path.joinpath('maps'), parents=True, exist_ok=True)
@@ -169,7 +189,7 @@ class Extractor:
     except KeyboardInterrupt:
       print('Aborting...')
     except Exception as e:
-      # print(f'{e} | {e.__class__.__name__}')
+      print(f'{e} | {e.__class__.__name__}')
       exit()
 
 
@@ -182,13 +202,15 @@ def start() -> None:
     return print('Divine pride api not found, aborting...')
 
   no_icons = env.bool('NO_ICONS', False)
+  no_animated_sprites = env.bool('NO_ANIMATED_SPRITES', False)
   no_map_images = env.bool('NO_MAP_IMAGES', False)
   ignore_mvp_with_empty_maps = env.bool('IGNORE_MVP_WITH_EMPTY_MAPS', False)
   use_filter = env.bool('USE_FILTER', False)
   desired_stats = env.list('DESIRED_STATS', None)
   output_path = get_output_path()
 
-  extractor = Extractor(use_filter, no_icons, no_map_images, ignore_mvp_with_empty_maps, desired_stats,
+  extractor = Extractor(use_filter, no_icons, no_animated_sprites, no_map_images,
+                        ignore_mvp_with_empty_maps, desired_stats,
                         divine_pride_api_key,
                         output_path=output_path)
   extractor.extract()
