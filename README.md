@@ -1,5 +1,16 @@
 # mvp-scraper
+
 Divine Pride mvp scraper
+
+## Features
+
+- [x] Save mvp info data
+- [x] Download mvp sprite
+- [x] Download animated mvp sprite
+- [x] Download respawn map image
+- [x] Filter mvp stats
+- [x] Can ignore mvp with no respawn
+- [ ] Easily change language of mvps names
 
 ## 💻 Requirements
 
@@ -18,3 +29,8 @@ pip install requests lxml
 ```
 
 ## 🔨 Usage
+
+```bash
+cd mvp-scraper
+python main.py
+```
